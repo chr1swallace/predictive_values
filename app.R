@@ -12,6 +12,7 @@ library(data.tree)
 library(DiagrammeR)
 library(personograph)
 library(ggplot2)
+library(markdown)
 source("helpers.R")
 
 # Define UI for application that draws a histogram
@@ -19,30 +20,7 @@ ui <- fluidPage(
   
   # Application title
   titlePanel("How accurate is that antibody test?"),
-  p("There has been a lot of talk lately about antibody tests, to check who has had coronavirus infection and is now immune. I am not a virologist, I cannot say whether these tests are 'good' or 'bad'.",
-    "But I am a statistician, so when people are talking about sensitivity and specificity, I do understand what those mean.",
-    "Inspired by various threads talking about Bayes' theorem, and in particular",
-    tags$a(href = "https://twitter.com/hwitteman/status/1249917008935882753?ref_src=twsrc%5Etfw", "this thread"),
-    "from Holly Witteman, which presents Bayes rule as a decision tree, I decided to make this page so I could examine how 'accurate' a test would be in different circumstances."),
-  
-  p("To know that, we first need to consider what most people mean by accurate.",
-    "One relevant interpretation, is the chance that you are immune, given the test says you are.",
-    "However, the standard way these tests are assessed is to take samples with known status (immune or not immune), and see how good the tests are at detecting the truth.", 
-    "These are"),
-  tags$ul(
-    tags$li("sensitivity: the chance of a positive result when a sample from a truly immune sample is tested"),
-    tags$li("specificity: the chance of a negative result when a sample from a truly non-immune sample is tested")
-  ),
-  p("These are illustrated in the top plot below.  But it is the wrong way round for how we want to use these tests, where we want to know the"),
-  tags$ul(
-    tags$li("positive predictive value: the chance of a sample being from an immune individual when a positive result is seen"),
-    tags$li("negative predictive value: the chance of a sample being from a truly non-immune individual when a negative result is seen")
-  ),
-  p("These are illustrated in the bottom plot below.  I've tried two ways to display this, either a waffle plot, where every mini-square represents an individual, and the square colour the state (immune or non-immune, test positive (+) or test negative (-)).  The same information can also be shown as a tree, imagining the results for 10000 people taking a test.  Try both, see what makes sense to you."),
-  p("The reason test evaluation is focused on sensitivity and specificity is that the positive and negative predictive values depend on the fraction of the population you are testing that is immune, and we need to know the properties of the test, not the population."),
-  p("To see how the immune fraction in the population affects the predictive value of a test, try moving the  immune fraction slider.",
-"You can also move the sensitivity and specificity.  Note, the starting values I've used reflect examples in the thread linked above, the actual values will be different for different tests and different populations across the world and within individual countries.",
-"I don't know their true values."),
+  includeMarkdown("intro.md"),
 # Sidebar with a slider input for number of bins 
 sidebarLayout(
   sidebarPanel(
@@ -149,9 +127,9 @@ server <- function(input, output) {
       if(grepl("^Not",node$name))
         label = paste0(100-input$imm,"%")
       if(grepl("Test positive",node$name))
-        label=if(grepl("^Immune",node$parent$name)) { paste0(round(100*f$imm.pos/f$imm),"%") } else { paste(round(100*f$nim.pos/f$nim),"%")}  
+        label=if(grepl("^Immune",node$parent$name)) { roundpc(f$imm.pos/f$imm) } else { roundpc(f$nim.pos/f$nim)}  
       if(grepl("Test negative",node$name))
-        label=if(grepl("^Immune",node$parent$name)) { paste0(round(100*f$imm.neg/f$imm),"%") } else { paste(round(100*f$nim.neg/f$nim),"%")}  
+        label=if(grepl("^Immune",node$parent$name)) { roundpc(f$imm.neg/f$imm) } else { roundpc(f$nim.neg/f$nim)}  
       return (label)
     }
     SetEdgeStyle(x, fontname = 'helvetica', label = GetEdgeLabel, color="grey35")
@@ -167,13 +145,13 @@ server <- function(input, output) {
     pimm <- pos$AddChild(paste0("POSITIVE PREDICTIVE VALUE:\n\n",
                                 "Immune: ",round(f$N*f$imm.pos),"\n\n",
                                 round(f$N*f$imm.pos),"/",round(f$N*(f$nim.pos+f$imm.pos))," = ",
-                                round(100*f$imm.pos/(f$nim.pos+f$imm.pos)),"%"))
+                                roundpc(f$imm.pos/(f$nim.pos+f$imm.pos))))
     nimm <- pos$AddChild(paste0("Not immune: ",round(f$N*f$imm.neg)))
     pnimm <- neg$AddChild(paste0("Immune: ",round(f$N*f$nim.pos)))
     nnimm <- neg$AddChild(paste0("NEGATIVE PREDICTIVE VALUE:\n\n",
                                  "Not immune: ",round(f$N*f$nim.neg),"\n\n",
                                  round(f$N*f$nim.neg),"/",round(f$N*(f$nim.neg+f$imm.neg))," = ",
-                                 round(100*f$nim.neg/(f$nim.neg+f$imm.neg)),"%"))
+                                 roundpc(f$nim.neg/(f$nim.neg+f$imm.neg))))
     SetGraphStyle(y, rankdir = "TB")
     SetEdgeStyle(y, color = "grey35", penwidth = 1)
     SetNodeStyle(y, style = "filled,rounded", shape = "box", fillcolor = "DarkSlateBlue", 
@@ -182,15 +160,15 @@ server <- function(input, output) {
     GetEdgeLabel <- function(node) {
           label = node$name
       if(grepl("^Test positive",node$name))
-        label = paste0(round(100*(f$imm.pos+f$nim.pos)),"%")
+        label = roundpc((f$imm.pos+f$nim.pos))
       if(grepl("^Test negative",node$name))
-        label = paste0(round(100*(f$imm.neg+f$nim.neg)),"%")
+        label = roundpc((f$imm.neg+f$nim.neg))
       if(grepl("^Not",node$name))
         label = paste0(100-input$imm,"%")
       if(grepl("Immune",node$name))
-        label=if(grepl("^Test positive",node$parent$name)) { paste0(round(100*(f$imm.pos/(f$pos))),"%") } else { paste(round(100*f$imm.neg/(f$neg)),"%")}  
+        label=if(grepl("^Test positive",node$parent$name)) { roundpc(f$imm.pos/(f$pos)) } else { roundpc(f$imm.neg/(f$neg))}  
       if(grepl("Not immune",node$name))
-        label=if(grepl("^Test positive",node$parent$name)) { paste0(round(100*f$nim.pos/(f$pos)),"%") } else { paste(round(100*f$nim.neg/(f$neg)),"%")}  
+        label=if(grepl("^Test positive",node$parent$name)) { roundpc(f$nim.pos/(f$pos)) } else { roundpc(f$nim.neg/(f$neg))}  
       return (label)
     }
     SetEdgeStyle(y, fontname = 'helvetica', label = GetEdgeLabel, color="grey35")
@@ -218,7 +196,7 @@ server <- function(input, output) {
     df["imm.neg","xmin"] <- df["nim.neg","xmax"] <- f$nim.neg/f$neg
     ann=data.frame(x=.5,y=c(f$pos/2,1-f$neg/2),
                    label=paste0(c("Positive predictive value: of test positives, ","Negative predictive value: of test negatives, "),
-                                round(c(f$imm.pos/f$pos, f$nim.neg/f$neg)*100),"% are ",
+                                roundpc(c(f$imm.pos/f$pos, f$nim.neg/f$neg))," are ",
                                 c("immune","non-immune")))
     # translate=c(imm.neg="Immune, -",nim.neg="Non-immune, -",imm.pos="Immune, +",nim.pos="Non-immune, +")
     translate=c(imm.neg="Immune, test negative",nim.neg="Non-immune, test negative",imm.pos="Immune, test positive",nim.pos="Non-immune, test positive")
@@ -241,7 +219,8 @@ server <- function(input, output) {
     f <- getf(input)
     df=data.frame(what=c("imm.pos","imm.neg","nim.pos","nim.neg"),stringsAsFactors = FALSE)
     rownames(df)=df$what
-    translate=c(imm.neg="Immune, test negative",nim.neg="Non-immune, test negative",imm.pos="Immune, test positive",nim.pos="Non-immune, test positive")
+    translate=c(imm.neg="Immune, test negative",nim.neg="Non-immune, test negative",
+                imm.pos="Immune, test positive",nim.pos="Non-immune, test positive")
     df$i=sub("\\..*","",df$what)
     df$t=sub(".*\\.","",df$what)
     df$f=f[df$what]
@@ -253,8 +232,8 @@ server <- function(input, output) {
     df["nim.pos","xmin"] <- df["nim.neg","xmax"] <- f$nim.neg/f$nim
     ann=data.frame(x=.5,y=c(f$imm/2,1-f$nim/2),
                    label=paste0(c("Specificity: of immune, ","Sensitivity: of non-immune, "),
-                                round(c(f$imm.pos/f$imm, f$nim.neg/f$nim)*100),"% test ",
-                                c("positive (+)","negative (-).")))
+                                roundpc(c(f$imm.pos/f$imm, f$nim.neg/f$nim))," test ",
+                                c("positive","negative")))
     pal=c(imm.neg=pastel6[1],imm.pos=muted6[1],nim.neg=pastel6[2],nim.pos=muted6[2])
     df
     ggplot(df) + 

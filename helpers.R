@@ -15,3 +15,10 @@ getf <- function(input) {
       res$neg=res$imm.neg+res$nim.neg
       res
 }
+
+roundpc <- function(x) {
+  x=as.character(round(100*x))
+  x[x=="100"] = ">99"
+  x[x=="0"] = "<1"
+  return(paste0(x,"%"))
+}
